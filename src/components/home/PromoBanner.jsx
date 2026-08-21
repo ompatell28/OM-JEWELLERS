@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import bannerModelImg from '../../assets/images/promo1.png';
@@ -56,39 +56,54 @@ const giftItems = [
 ];
 
 export const PromoBanner = () => {
-  const [startIndex, setStartIndex] = useState(0);
+  const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
-  const scrollContainerRef = useRef(null);
 
   const sectionRef = useRef(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-60px" });
 
-  const totalItems = giftItems.length;
-
-  const nextSlide = () => {
-    setStartIndex((prev) => {
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-      const visibleCount = isMobile ? 1 : 3;
-      return prev + 1 > totalItems - visibleCount ? 0 : prev + 1;
-    });
-  };
-
-  const prevSlide = () => {
-    setStartIndex((prev) => {
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-      const visibleCount = isMobile ? 1 : 3;
-      return prev === 0 ? Math.max(0, totalItems - visibleCount) : prev - 1;
-    });
-  };
-
-  // Auto scroll
+  // Continuous Auto-Loop Scroll (No blank white space at the end)
   useEffect(() => {
-    if (isHovered) return;
-    const timer = setInterval(() => {
-      nextSlide();
+    if (isHovered || !scrollRef.current) return;
+
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+        const maxScroll = scrollWidth - clientWidth;
+        const scrollStep = clientWidth > 640 ? 210 : 170;
+
+        if (scrollLeft >= maxScroll - 12) {
+          scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          scrollRef.current.scrollBy({ left: scrollStep, behavior: 'smooth' });
+        }
+      }
     }, 3500);
-    return () => clearInterval(timer);
+
+    return () => clearInterval(interval);
   }, [isHovered]);
+
+  // Arrow Scroll (< >)
+  const handleScroll = (direction) => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    const scrollStep = clientWidth > 640 ? 210 : 170;
+
+    if (direction === 'left') {
+      if (scrollLeft <= 10) {
+        scrollRef.current.scrollTo({ left: maxScroll, behavior: 'smooth' });
+      } else {
+        scrollRef.current.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+      }
+    } else {
+      if (scrollLeft >= maxScroll - 10) {
+        scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        scrollRef.current.scrollBy({ left: scrollStep, behavior: 'smooth' });
+      }
+    }
+  };
 
   return (
     <section 
@@ -96,6 +111,8 @@ export const PromoBanner = () => {
       className="w-full px-3 sm:px-6 lg:px-12 py-6 bg-[#FAF6F0] overflow-hidden select-none"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={() => setIsHovered(true)}
+      onTouchEnd={() => setIsHovered(false)}
     >
       <motion.div
         initial={{ opacity: 0, y: 35, scale: 0.98 }}
@@ -138,58 +155,55 @@ export const PromoBanner = () => {
           </div>
         </motion.div>
 
-        {/* Right Product Slider Section */}
+        {/* Right Product Carousel Section */}
         <motion.div
           initial={{ opacity: 0, x: 25 }}
           animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 25 }}
           transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
-          className="lg:col-span-7 bg-[#FCF9F2] p-5 sm:p-7 flex flex-col justify-between"
+          className="lg:col-span-7 bg-[#FCF9F2] p-4 sm:p-7 flex flex-col justify-between overflow-hidden"
         >
-          <div className="overflow-hidden w-full relative">
-            <div
-              ref={scrollContainerRef}
-              className="flex gap-3 sm:gap-4 transition-transform duration-500 ease-out"
-              style={{
-                transform: `translateX(-${startIndex * (typeof window !== 'undefined' && window.innerWidth < 640 ? 55 : 34)}%)`
-              }}
-            >
-              {giftItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="w-[145px] sm:w-[175px] md:w-[190px] shrink-0 flex flex-col group cursor-pointer"
-                >
-                  <div className="w-full h-36 sm:h-44 bg-white rounded-2xl p-3 flex items-center justify-center border border-[#E8DFD1] shadow-xs group-hover:border-[#6B1F22] group-hover:shadow-md transition-all duration-300">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-contain group-hover:scale-108 transition-transform duration-500"
-                    />
-                  </div>
-
-                  <div className="mt-2.5 px-1">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs sm:text-sm font-bold text-[#6B1F22]">
-                        {item.price}
-                      </span>
-                      <span className="text-[10px] sm:text-[11px] text-gray-400 line-through font-normal">
-                        {item.originalPrice}
-                      </span>
-                    </div>
-                    <p className="text-[11px] sm:text-xs text-gray-700 truncate mt-0.5 group-hover:text-[#6B1F22] transition-colors" title={item.name}>
-                      {item.name}
-                    </p>
-                  </div>
+          {/* Scrollable Products Container */}
+          <div
+            ref={scrollRef}
+            className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth no-scrollbar py-1"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {giftItems.map((item) => (
+              <div
+                key={item.id}
+                className="w-[145px] sm:w-[175px] md:w-[190px] shrink-0 flex flex-col group cursor-pointer"
+              >
+                <div className="w-full h-36 sm:h-44 bg-white rounded-2xl p-3 flex items-center justify-center border border-[#E8DFD1] shadow-xs group-hover:border-[#6B1F22] group-hover:shadow-md transition-all duration-300">
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="w-full h-full object-contain group-hover:scale-108 transition-transform duration-500"
+                  />
                 </div>
-              ))}
-            </div>
+
+                <div className="mt-2.5 px-1">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-[#6B1F22]">
+                      {item.price}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-400 line-through font-normal">
+                      {item.originalPrice}
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-gray-700 truncate mt-0.5 group-hover:text-[#6B1F22] transition-colors" title={item.name}>
+                    {item.name}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Bottom Bar (Buttons + CTA) */}
-          <div className="flex items-center justify-between mt-5 pt-3.5 border-t border-[#E8DFD1]">
+          {/* Bottom Bar Controls */}
+          <div className="flex items-center justify-between mt-4 sm:mt-5 pt-3.5 border-t border-[#E8DFD1]">
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={prevSlide}
+                onClick={() => handleScroll('left')}
                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#6B1F22] text-white hover:bg-[#521619] flex items-center justify-center shadow-xs transition-transform active:scale-90 cursor-pointer"
                 aria-label="Previous Products"
               >
@@ -198,7 +212,7 @@ export const PromoBanner = () => {
 
               <button
                 type="button"
-                onClick={nextSlide}
+                onClick={() => handleScroll('right')}
                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#6B1F22] text-white hover:bg-[#521619] flex items-center justify-center shadow-xs transition-transform active:scale-90 cursor-pointer"
                 aria-label="Next Products"
               >
@@ -207,7 +221,7 @@ export const PromoBanner = () => {
             </div>
 
             <a
-              href="/shop"
+              href="/gifts/for-him"
               className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-[#6B1F22] hover:bg-[#521619] text-white text-[11px] sm:text-xs font-semibold uppercase tracking-wider shadow-xs transition-all active:scale-95 text-center"
             >
               Shop Now
